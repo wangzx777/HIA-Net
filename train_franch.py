@@ -25,7 +25,7 @@ def init_optim(opt, model, epoch=None):
     '''
     Initialize optimizer
     '''
-    optim = torch.optim.Adam(params=model.parameters(), lr=opt.learning_rate, weight_decay=0.01)
+    optim = torch.optim.Adam(params=model.parameters(), lr=opt.learning_rate)
     return optim
 
 def val(parser,data_dset, data_sampler, model,protonet):
@@ -63,7 +63,7 @@ def val(parser,data_dset, data_sampler, model,protonet):
             source_fusion = model(source_eeg_batch,source_eye_batch)
             val_fusion = model(val_eeg_batch, val_eye_batch)
 
-            dist_tgt = protonet([source_fusion[0], val_fusion[0]], [source_labels, val_labels],
+            dist_tgt = protonet([source_fusion[-1], val_fusion[-1]], [source_labels, val_labels],
                                 parser.classes_per_it_tgt, parser.num_support_tgt, parser.num_query_tgt,flag = 1)
 
             proto_loss, proto_acc, _ = prototypical_loss2(dist_tgt, parser.classes_per_it_tgt, parser.num_query_tgt, parser)
@@ -111,7 +111,7 @@ def test(parser,data_dset, data_sampler, model,protonet):
             source_fusion = model(source_eeg_batch, source_eye_batch)
             test_fusion = model(test_eeg_batch, test_eye_batch)
 
-            dist_tgt = protonet([source_fusion[0], test_fusion[0]], [source_labels, test_labels],
+            dist_tgt = protonet([source_fusion[-1], test_fusion[-1]], [source_labels, test_labels],
                                 parser.classes_per_it_tgt, parser.num_support_tgt, parser.num_query_tgt, flag=1)
 
             proto_loss, proto_acc, conf_matrix = prototypical_loss2(dist_tgt, parser.classes_per_it_tgt, parser.num_query_tgt, parser)
@@ -146,7 +146,7 @@ def main(parser,data_dset, data_sampler, writer,early_stopping):
 
     params = list(model.parameters())
     # Optimizer
-    optim = torch.optim.Adam(params=params, lr=parser.learning_rate, weight_decay=0.01)
+    optim = torch.optim.Adam(params=params, lr=parser.learning_rate)
     # # 使用学习率调度器
     # scheduler = StepLR(optim, step_size=10, gamma=0.5)
 
@@ -198,13 +198,14 @@ def main(parser,data_dset, data_sampler, writer,early_stopping):
             target_fusion = model(target_eeg_batch, target_eye_batch)
 
             # gdd_loss_eeg = gdd(src_eeg, tgt_eeg)
-            gdd_loss1 = gdd(source_fusion[0], target_fusion[0])
-            # gdd_loss2 = gdd(source_fusion[1], target_fusion[1])
-            # gdd_loss3 = gdd(source_fusion[2], target_fusion[2])
-            # gdd_loss4 = gdd(source_fusion[3], target_fusion[3])
-            # gdd_loss5 = gdd(source_fusion[4], target_fusion[4])
 
-            dist_src = protonet(source_fusion[0], source_labels, parser.classes_per_it_src, parser.num_support_src, parser.num_query_src)
+            # 1. 计算多层 gdd 损失
+            gdd_losses = [
+                gdd(src, tgt)
+                for src, tgt in zip(source_fusion, target_fusion)
+            ]  # 得到长度为 5 的列表 [gdd_loss1, …, gdd_loss5]
+
+            dist_src = protonet(source_fusion[-1], source_labels, parser.classes_per_it_src, parser.num_support_src, parser.num_query_src)
             proto_loss_src, proto_acc_src, _ = prototypical_loss2(dist_src, parser.classes_per_it_src, parser.num_query_src,parser)
 
             # dist_tgt = protonet(target_fusion[0], target_labels, parser.classes_per_it_tgt, parser.num_support_tgt, parser.num_query_tgt)
@@ -215,22 +216,14 @@ def main(parser,data_dset, data_sampler, writer,early_stopping):
             a = 0.5  # 权重的缩放因子
             b = 1  # 对数函数的系数
 
-            # 计算权重
-            w = [a * np.log(b * i + 1) for i in range(1, 2)]
-
-            # 打印结果
-            w1 = w[0]
-
+            # 先计算各层的对数权重：w[i] = a * log(b*(i+1) + 1)
+            raw_weights = a * np.log(b * np.arange(1, len(gdd_losses) + 1) + 1)
             # 归一化
-            total_weight = w1
-            w1 /= total_weight
-            # w2 /= total_weight
-            # w3 /= total_weight
-            # w4 /= total_weight
-            # w5 /= total_weight
-
-            gdd_loss = gamma * (w1 * gdd_loss1)
-
+            weights = raw_weights / raw_weights.sum()
+            
+            # 5. 合并 gdd 损失
+            # gdd_loss = gamma * sum(w * loss for w, loss in zip(weights, gdd_losses))
+            gdd_loss = gamma * gdd_losses[-1]
             loss = proto_loss_src + gdd_loss
 
             # 更新参数
@@ -284,7 +277,8 @@ def main(parser,data_dset, data_sampler, writer,early_stopping):
         conf_matrix = best_conf_matrix
     else:
         conf_matrix = last_conf_matrix
-
+    # visualize_confusion_matrix(conf_matrix, class_names=['Negative', 'Neutral', 'Positive'],
+    #                            save_path="zmjjkk.png")
     return best_test_loss, best_test_acc, last_test_loss, last_test_acc ,conf_matrix
 
 def visualize_confusion_matrix(conf_matrix, class_names, save_path="confusion_matrix_SEED.png"):
@@ -305,15 +299,15 @@ def visualize_confusion_matrix(conf_matrix, class_names, save_path="confusion_ma
         cmap='Blues',
         xticklabels=class_names,
         yticklabels=class_names,
-        annot_kws={"size": 14,"weight": "bold"},  # 设置单元格内字体大小和粗细
+        annot_kws={"size": 20,"weight": "bold"},  # 设置单元格内字体大小和粗细
         # cbar_kws={'format': '%.0f%%'}  # 将颜色条标签显示为百分比
     )
 
-    plt.xticks(fontsize=14)
-    plt.yticks(fontsize=14, rotation=0)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18, rotation=0)
 
     # 保存图片并关闭绘图窗口
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.savefig(save_path, dpi=800, bbox_inches='tight')
     plt.close()
 
     print(f"混淆矩阵已保存为 {save_path}")
@@ -337,8 +331,8 @@ if __name__ == "__main__":
 
     # Load data set
 
-    eeg_path = "/disk2/home/yuankang.fu/SEED-Franch/EEG-DE-features/eeg_used_4s" # change the Data path!!!
-    eye_path = "/disk2/home/yuankang.fu/SEED-Franch/Eye-tracking-features/eye_tracking_feature"
+    eeg_path = "/disk2/home/yuankang.fu/Datasets/SEED-Franch/EEG-DE-features/eeg_used_4s" # change the Data path!!!
+    eye_path = "/disk2/home/yuankang.fu/Datasets/SEED-Franch/Eye-tracking-features/eye_tracking_feature"
 
     session_acc = []
     total_conf_matrix = np.zeros((3, 3))  # 初始化累积混淆矩阵

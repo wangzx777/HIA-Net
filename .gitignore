@@ -1,0 +1,50 @@
+# --- Python 相关 ---
+__pycache__/
+*.py[cod]
+*$py.class
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# --- 虚拟环境 (对应你图中的 .venv) ---
+.venv/
+venv/
+ENV/
+env/
+
+# --- 数据和模型权重 (非常重要！这些文件通常很大，不建议传到Git) ---
+# 忽略所有数据文件夹下的内容，但保留文件夹本身（可选）
+data/tensorboard/
+# 如果 models 文件夹里存的是几百MB的权重文件，建议忽略
+models/*.pth
+models/*.pth.tar
+models/*.h5
+models/*.weights
+models/*.pkl
+
+# --- 日志文件 ---
+log/
+*.log
+
+# --- 编辑器/IDE 相关 ---
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# --- 实验结果 ---
+results/
+figures/

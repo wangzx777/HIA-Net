@@ -12,16 +12,16 @@ class CrossAttentionLayer(nn.Module):
 
     def forward(self, x_q, x_kv):
         # 生成Q、K、V
-        Q = self.linear_q(x_q)  # (batch_size, seq_len_eeg, d_model)
-        K = self.linear_k(x_kv)  # (batch_size, seq_len_et, d_model)
-        V = self.linear_v(x_kv)  # (batch_size, seq_len_et, d_model)
+        Q = self.linear_q(x_q)  # (batch_size, d_model)
+        K = self.linear_k(x_kv)  # (batch_size, d_model)
+        V = self.linear_v(x_kv)  # (batch_size, d_model)
 
         # 计算注意力权重
         attention_scores = torch.matmul(Q, K.transpose(-2, -1)) / math.sqrt(Q.size(-1))
         attention_weights = F.softmax(attention_scores, dim=-1)
 
         # 计算加权的V
-        cross_attended_features = torch.matmul(attention_weights, V)  # (batch_size, seq_len_eeg, d_model)
+        cross_attended_features = torch.matmul(attention_weights, V)  # (batch_size, d_model)
 
         return cross_attended_features
 
@@ -34,15 +34,13 @@ class MLCrossAttentionGating(nn.Module):
         self.linear_et = nn.Linear(et_dim, d_model)
 
         # 门控机制线性层，用于计算门控权重
-        self.gate_eeg = nn.Linear(d_model, d_model)
-        self.gate_et = nn.Linear(d_model, d_model)
+        self.gate = nn.Linear(d_model, d_model)
 
         # 三层独立的交叉注意力模块
         self.cross_attention_layers = nn.ModuleList([
             CrossAttentionLayer(d_model) for _ in range(num_layers)
         ])
 
-        # self.attention = torch.nn.Linear(512, 2)
         # 融合后的MLP
         self.fusion_mlp = nn.Sequential(
             nn.Linear(2 * d_model, d_model),
@@ -66,31 +64,17 @@ class MLCrossAttentionGating(nn.Module):
             cross_attended_features = layer(residual_output.unsqueeze(1), et_transformed.unsqueeze(1))  # (batch_size, 1, d_model)
 
             # 门控机制：对EEG和ET特征进行加权
-            # gate_eeg = torch.sigmoid(self.gate_eeg(residual_output))  # (batch_size, d_model)
-            gate_et = torch.sigmoid(self.gate_et(cross_attended_features.squeeze(1)))  # (batch_size, d_model)
+            gate = torch.sigmoid(self.gate(cross_attended_features.squeeze(1)))  # (batch_size, d_model)
 
             # 应用门控权重
-            # gated_eeg = residual_output * gate_eeg  # (batch_size, d_model)
-            gated_et = cross_attended_features.squeeze(1) * gate_et  # (batch_size, d_model)
+            gated = cross_attended_features.squeeze(1) * gate  # (batch_size, d_model)
 
-            # 融合
+            combined = torch.cat((residual_output, gated), dim=1)  # 形状为 (batch_size, 512)
+            # combined = torch.cat((residual_output, cross_attended_features.squeeze(1)), dim=1)  # 形状为 (batch_size, 512)
 
-            # 计算注意力权重
-            # 将两个向量拼接起来，以便计算注意力
-            combined = torch.cat((residual_output, gated_et), dim=1)  # 形状为 (batch_size, 512)
-            fused_output = self.fusion_mlp(combined)  # (batch_size, seq_len_eeg, d_model)
+            fused_output = self.fusion_mlp(combined)  # (batch_size, d_model)
 
-            # # 通过一个线性层计算注意力得分
-            # attention_scores = F.softmax(self.attention(combined), dim=1)  # 计算权重
-
-            # # 将权重应用于两个向量
-            # weighted_residual = attention_scores[:, 0].unsqueeze(1) * residual_output  # 对应权重
-            # weighted_gated_et = attention_scores[:, 1].unsqueeze(1) * gated_et  # 对应权重
-
-            # 加权融合
-            # fused_output = weighted_residual + weighted_gated_et  # (batch_size, 256)
-
-            # 残差连接：将当前层的输出与上一层的残差相加
+            # 残差连接：将当前层的输出与EEG的输入相加
             residual_output = eeg_transformed + fused_output  # (batch_size, d_model)
 
             # 保存中间层的输出

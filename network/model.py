@@ -10,14 +10,12 @@ class MyModel(nn.Module):
         super(MyModel, self).__init__()
         self.rescbam = ResCBAM()  # ResCBAM 模块
         self.ETnet = DenseNet1D()
-        # 融合后的MLP
-        # self.encoder = MLCrossAttentionGating(eeg_input_dim, eye_input_dim , d_model=output_dim)  # 编码器模块
+        self.encoder = MLCrossAttentionGating(eeg_input_dim, eye_input_dim , d_model=output_dim)
 
     def forward(self, eeg_input, eye_input):
         # 将 EEG 和眼动数据输入 ResCBAM 和编码器
         eeg_features = self.rescbam(eeg_input)
         et_features = self.ETnet(eye_input)
-        fusion = torch.cat((eeg_features,et_features),dim=-1)
-        # fusion = self.encoder(eeg_features, et_features)
+        fusion = self.encoder(eeg_features, et_features)
         return fusion  # 返回组合后的特征
 

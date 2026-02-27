@@ -66,7 +66,7 @@ def val(parser,data_dset, data_sampler, model,protonet):
             source_fusion = model(source_eeg_batch,source_eye_batch)
             val_fusion = model(val_eeg_batch, val_eye_batch)
 
-            dist_tgt = protonet([source_fusion[2], val_fusion[2]], [source_labels, val_labels],
+            dist_tgt = protonet([source_fusion[-1], val_fusion[-1]], [source_labels, val_labels],
                                 parser.classes_per_it_tgt, parser.num_support_tgt, parser.num_query_tgt,flag = 1)
 
             proto_loss, proto_acc, _ = prototypical_loss2(dist_tgt, parser.classes_per_it_tgt, parser.num_query_tgt, parser)
@@ -116,11 +116,11 @@ def test(parser,data_dset, data_sampler, model,protonet,save_path):
             test_fusion = model(test_eeg_batch, test_eye_batch)
 
             # if flag == False :
-            #     plot_tsne_2d(source_fusion[2], test_fusion[2], source_labels, test_labels,
+            #     plot_tsne_2d(source_fusion[-1], test_fusion[-1], source_labels, test_labels,
             #                  save_path=save_path)
             #     flag = True
 
-            dist_tgt = protonet([source_fusion[2], test_fusion[2]], [source_labels, test_labels],
+            dist_tgt = protonet([source_fusion[-1], test_fusion[-1]], [source_labels, test_labels],
                                 parser.classes_per_it_tgt, parser.num_support_tgt, parser.num_query_tgt, flag=1)
 
             proto_loss, proto_acc, conf_matrix = prototypical_loss2(dist_tgt, parser.classes_per_it_tgt, parser.num_query_tgt, parser)
@@ -208,21 +208,24 @@ def main(parser,data_dset, data_sampler, writer,early_stopping):
             target_fusion = model(target_eeg_batch, target_eye_batch)
 
             # if flag == False :
-            #     plot_tsne_2d(source_fusion[2], target_fusion[2], source_labels, target_labels,
+            #     print(f"source_fusion[-1].shape:{source_fusion[-1].shape}")
+            #     print(f"target_fusion[-1].shape:{target_fusion[-1].shape}")
+            #     plot_tsne_2d(source_fusion[-1], target_fusion[-1], source_labels, target_labels,
             #                  save_path="tsne_SEED_origin.png")
             #     flag = True
-            #
+            
             # if it == parser.iterations - 1:
-            #     plot_tsne_2d(source_fusion[2], target_fusion[2], source_labels, target_labels,
-            #                  save_path="tsne_SEED_trained.png")
+            #     plot_tsne_2d(source_fusion[-1], target_fusion[-1], source_labels, target_labels,
+            #                  save_path="3tsne_SEED_trained.png")
 
-            gdd_loss1 = gdd(source_fusion[0], target_fusion[0])
-            gdd_loss2 = gdd(source_fusion[1], target_fusion[1])
-            gdd_loss3 = gdd(source_fusion[2], target_fusion[2])
-            # gdd_loss4 = gdd(source_fusion[3], target_fusion[3])
-            # gdd_loss5 = gdd(source_fusion[4], target_fusion[4])
+ 
+            # 1. 计算多层 gdd 损失
+            gdd_losses = [
+                gdd(src, tgt)
+                for src, tgt in zip(source_fusion, target_fusion)
+            ]  # 得到长度为 5 的列表 [gdd_loss1, …, gdd_loss5]
 
-            dist_src = protonet(source_fusion[2], source_labels, parser.classes_per_it_src, parser.num_support_src, parser.num_query_src)
+            dist_src = protonet(source_fusion[-1], source_labels, parser.classes_per_it_src, parser.num_support_src, parser.num_query_src)
             proto_loss_src, proto_acc_src, _ = prototypical_loss2(dist_src, parser.classes_per_it_src, parser.num_query_src,parser)
 
             # gdd_loss = 0.25 * gdd_loss1 + 0.5 * gdd_loss2 + 1 * gdd_loss3
@@ -232,22 +235,14 @@ def main(parser,data_dset, data_sampler, writer,early_stopping):
             a = 0.5  # 权重的缩放因子
             b = 1  # 对数函数的系数
 
-            # 计算权重
-            w = [a * np.log(b * i + 1) for i in range(1,4)]
-            # print(w)
-            # 打印结果
-            w1,w2,w3= w
-
+            # 先计算各层的对数权重：w[i] = a * log(b*(i+1) + 1)
+            raw_weights = a * np.log(b * np.arange(1, len(gdd_losses) + 1) + 1)
             # 归一化
-            total_weight = w1 + w2 + w3
-            w1 /= total_weight
-            w2 /= total_weight
-            w3 /= total_weight
-            # w4 /= total_weight
-            # w5 /= total_weight
-            gdd_loss = gamma * (w1 * gdd_loss1 + w2 * gdd_loss2 + w3 * gdd_loss3)
-
-            # prototype_loss = intra_class_loss - inter_class_loss
+            weights = raw_weights / raw_weights.sum()
+            
+            # 5. 合并 gdd 损失
+            gdd_loss = gamma * sum(w * loss for w, loss in zip(weights, gdd_losses))
+            # gdd_loss = gamma * gdd_losses[-1]
             loss = proto_loss_src + gdd_loss
 
             # 更新参数
@@ -313,7 +308,8 @@ def main(parser,data_dset, data_sampler, writer,early_stopping):
         conf_matrix = best_conf_matrix
     else:
         conf_matrix = last_conf_matrix
-
+    # visualize_confusion_matrix(conf_matrix, class_names=['Negative', 'Neutral', 'Positive'],
+    #                            save_path="kkzmjj.png")
     return best_test_loss, best_test_acc, last_test_loss, last_test_acc ,conf_matrix
 
 
@@ -335,15 +331,15 @@ def visualize_confusion_matrix(conf_matrix, class_names, save_path="confusion_ma
         cmap='Blues',
         xticklabels=class_names,
         yticklabels=class_names,
-        annot_kws={"size": 14,"weight": "bold"},  # 设置单元格内字体大小和粗细
+        annot_kws={"size": 20,"weight": "bold"},  # 设置单元格内字体大小和粗细
         # cbar_kws={'format': '%.0f%%'}  # 将颜色条标签显示为百分比
     )
 
-    plt.xticks(fontsize=14)
-    plt.yticks(fontsize=14, rotation=0)
+    plt.xticks(fontsize=18)
+    plt.yticks(fontsize=18, rotation=0)
 
     # 保存图片并关闭绘图窗口
-    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.savefig(save_path, dpi=800, bbox_inches='tight')
     plt.close()
 
     print(f"混淆矩阵已保存为 {save_path}")
@@ -370,8 +366,9 @@ def plot_tsne_2d(embeddings_source, embeddings_target, labels_source, labels_tar
     labels = torch.cat([labels_source, labels_target])
 
     # 使用 t-SNE 将嵌入降到二维，并应用优化的 trick 参数
-    tsne = TSNE(n_components=2, perplexity=20, early_exaggeration=10, learning_rate='auto',
-                max_iter=700, random_state=42, method='barnes_hut', angle=0.3)
+    tsne = TSNE(n_components=2, perplexity=5, early_exaggeration=10, learning_rate='auto',
+                max_iter=500, random_state=42, method='exact', angle=0.3)
+    # tsne = TSNE(n_components=2, random_state=42)
     embeddings_2d = tsne.fit_transform(embeddings.cpu().numpy())  # 转换为 NumPy
 
     # 定义颜色、形状映射和图例
@@ -405,10 +402,8 @@ def plot_tsne_2d(embeddings_source, embeddings_target, labels_source, labels_tar
 
     # 如果提供了保存路径，则保存图片
     if save_path:
-        plt.savefig(save_path, dpi=300, bbox_inches='tight')
+        plt.savefig(save_path, dpi=800, bbox_inches='tight')
         print(f"图像已保存到 {save_path}")
-
-
 
 
 if __name__ == "__main__":
@@ -435,8 +430,8 @@ if __name__ == "__main__":
                           '13_3', '14_3']]
 
     # Load data set
-    eeg_path = "/disk2/home/yuankang.fu/SEED-China/02-EEG-DE-feature/eeg_used_4s" # change the Data path!!!
-    eye_path = "/disk2/home/yuankang.fu/SEED-China/04-Eye-tracking-feature/eye_tracking_feature"
+    eeg_path = "/disk2/home/yuankang.fu/Datasets/SEED-China/02-EEG-DE-feature/eeg_used_4s" # change the Data path!!!
+    eye_path = "/disk2/home/yuankang.fu/Datasets/SEED-China/04-Eye-tracking-feature/eye_tracking_feature"
     # for font in matplotlib.font_manager.fontManager.ttflist:
     #     print(font.name)
     session_acc = []

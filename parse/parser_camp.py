@@ -17,15 +17,15 @@ params = {
     'lr_scheduler_gamma': 0.5,
     'n_episodes': 20,  # number of episodes/iterations in an epoch
     'n_classes_per_episode_src': 3,  # number of classes used in an episode of source
-    'n_supports_per_class_src': 5,  # numbers of support samples of each class of source
+    'n_supports_per_class_src': 1,  # numbers of support samples of each class of source
     'n_querys_per_class_src': 20,  # CAN BE MODIFIED. number of query samples of each class of source
     'n_classes_per_episode_tgt': 3,  # number of classes used in an episode of target
-    'n_supports_per_class_tgt': 5,  # number of support samples of each class of target
+    'n_supports_per_class_tgt': 1,  # number of support samples of each class of target
     'n_querys_per_class_tgt': 20,  # CAN BE MODIFIED.number of query samples of each class of target
     'manual_seed': 42,
-    'cuda': 0,  # cuda ID
+    'cuda': 1,  # cuda ID
     'optim': 'Adam',  # which optimizer to use general:Adam mudafn:SGD sudafn:SGD FN:Adam
-    'patience': 10,  # patience for early stopping
+    'patience': 15,  # patience for early stopping
     'num_bands': 5,  # number of EEG bands, DEAP:4, SEED:5
     'num_sources': 12,  # number of source domains, total subject number of DEAP/SEED:32/15
     'num_cal': 120, # num_cal = (num_support + num_query) * num_classes

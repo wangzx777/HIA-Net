@@ -90,33 +90,3 @@ class ResCBAM(nn.Module):
 
         return output
 
-class ResCBAMDecoder(nn.Module):
-    def __init__(self, output_channels=5, hid_channels=64, output_dim=1024):
-        super(ResCBAMDecoder, self).__init__()
-
-        # 解码器部分
-        self.linear = nn.Linear(output_dim, hid_channels * 9 * 9)  # 将潜在特征映射到初始特征图的大小
-        self.deconv1 = nn.ConvTranspose2d(hid_channels, hid_channels, kernel_size=2, stride=2)  # 上采样
-        self.deconv2 = nn.ConvTranspose2d(hid_channels, hid_channels // 2, kernel_size=3, padding=1)  # 卷积
-        self.deconv3 = nn.ConvTranspose2d(hid_channels // 2, output_channels, kernel_size=2, stride=2)  # 输出层
-
-        self.bn1 = nn.BatchNorm2d(hid_channels)
-        self.bn2 = nn.BatchNorm2d(hid_channels // 2)
-        self.relu = nn.ReLU(inplace=False)
-
-    def forward(self, x):
-        # 线性层将潜在特征转换为初始的特征图大小
-        x = self.linear(x)
-        x = x.view(-1, 64, 9, 9)  # 假设将特征图形状调整为 (batchsize, hid_channels, 9, 9)
-
-        # 解码过程
-        x = self.relu(self.bn1(x))
-        x = self.deconv1(x)  # 第一次上采样
-
-        x = self.relu(self.bn1(x))
-        x = self.deconv2(x)  # 卷积
-
-        x = self.relu(self.bn2(x))
-        x = self.deconv3(x)  # 输出层，恢复到原始通道数
-
-        return x
