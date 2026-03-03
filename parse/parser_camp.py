@@ -174,6 +174,17 @@ def get_parser():
                         help='whether use target CE loss',  # 是否使用目标域CE损失
                         default=params['SDA'])
 
+    # ============ 数据路径配置 ============
+    parser.add_argument('--eeg_path',
+                        type=str,
+                        help='path to EEG data directory',
+                        default='/disk2/home/yuankang.fu/Datasets/SEED-China/02-EEG-DE-feature/eeg_used_4s')
+
+    parser.add_argument('--eye_path',
+                        type=str,
+                        help='path to eye-tracking data directory',
+                        default='/disk2/home/yuankang.fu/Datasets/SEED-China/04-Eye-tracking-feature/eye_tracking_feature')
+
     return parser
 
 

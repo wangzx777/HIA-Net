@@ -551,8 +551,8 @@ if __name__ == "__main__":
     ]
 
     # 数据路径配置（需要根据实际环境修改）
-    eeg_path = "/disk2/home/yuankang.fu/Datasets/SEED-Franch/EEG-DE-features/eeg_used_4s"
-    eye_path = "/disk2/home/yuankang.fu/Datasets/SEED-Franch/Eye-tracking-features/eye_tracking_feature"
+    eeg_path = parser.eeg_path
+    eye_path = parser.eye_path
 
     # ==================== 跨session实验 ====================
     session_acc = []  # 记录每个session的平均准确率
