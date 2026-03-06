@@ -199,6 +199,36 @@ def load_data(parser, eeg_path, eye_path, eeg_session_names, eye_session_names, 
 
     return eeg_sample, eye_sample, labels
 
+"""
+1. mode = 'full' （源域全部数据）
+应用场景：提取那 7 个源域受试者的数据。
+输出内容：这 7 个人的所有样本，不加任何切分。
+输出形状：
+EEG: (约 5838, 5, 9, 9) (7人 × 834)
+Eye: (约 5838, 33)
+Label: (约 5838,)
+2. mode = 'train' （目标域 Support 集）
+应用场景：提取第 8 个目标受试者的极少量参考样本（Support）。
+输出内容：从这个人里面，每个情绪类别强制只抽出 1 个样本（3类 × 1个 = 3个）。
+输出形状：
+EEG: (3, 5, 9, 9)
+Eye: (3, 33)
+Label: (3,)
+3. mode = 'val' （目标域验证集）
+应用场景：提取第 8 个目标受试者的验证样本（用于 Early Stopping 防止过拟合）。
+输出内容：代码里写死了 train_size=300，强制抽出 300 个样本。
+输出形状：
+EEG: (300, 5, 9, 9)
+Eye: (300, 33)
+Label: (300,)
+4. mode = 'test' （目标域 Query 集 / 测试集）
+应用场景：提取第 8 个目标受试者的待测样本（最终考试题）。
+输出内容：这个人剩下的所有数据（834 - 3 - 300 = 531 个）。
+输出形状：
+EEG: (约 531, 5, 9, 9)
+Eye: (约 531, 33)
+Label: (约 531,)
+"""
 
 def reshape_feature(fts_sample):
     """
