@@ -175,15 +175,18 @@ def get_parser():
                         default=params['SDA'])
 
     # ============ 数据路径配置 ============
+   # ============ 数据路径配置 ============
     parser.add_argument('--eeg_path',
                         type=str,
                         help='path to EEG data directory',
-                        default='/disk2/home/yuankang.fu/Datasets/SEED-China/02-EEG-DE-feature/eeg_used_4s')
+                        # 将下面这行修改为你 Windows 上的路径（注意前面的 r）
+                        default=r'D:\Work Dir\HIA-Net\dataset\SEED-Franch\EEG-DE-features\eeg_used_4s')
 
     parser.add_argument('--eye_path',
                         type=str,
                         help='path to eye-tracking data directory',
-                        default='/disk2/home/yuankang.fu/Datasets/SEED-China/04-Eye-tracking-feature/eye_tracking_feature')
+                        # 将下面这行修改为你 Windows 上的路径（注意前面的 r）
+                        default=r'D:\Work Dir\HIA-Net\dataset\SEED-Franch\Eye-tracking-features\eye_tracking_feature')
 
     return parser
 

@@ -33,7 +33,7 @@ class EarlyStoppingAccuracy:
         self.counter = 0          # 连续不提升的epoch计数器
         self.best_score = None    # 当前最佳准确率
         self.early_stop = False   # 是否触发早停
-        self.acc_max = -np.Inf    # 历史最高准确率（初始化为负无穷）
+        self.acc_max = -np.inf    # 历史最高准确率（初始化为负无穷）
         self.delta = delta         # 最小提升阈值
         self.individual_id = individual_id  # 被试ID，用于跨被试实验
         self.session_id = session_id        # 会话ID，SEED数据集有3个session
